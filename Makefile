@@ -4,16 +4,26 @@ INCLUDES = -Iinclude
 SRCDIR = src
 OBJDIR = obj
 BINDIR = bin
-TARGET = $(BINDIR)/cifar_cnn
 
-SRCS = $(wildcard $(SRCDIR)/*.c)
-OBJS = $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SRCS))
+COMMON_SRCS = $(SRCDIR)/activations.c $(SRCDIR)/conv_layer.c $(SRCDIR)/dataset.c \
+              $(SRCDIR)/fc_layer.c $(SRCDIR)/maxpool_layer.c $(SRCDIR)/softmax.c $(SRCDIR)/utils.c
 
-all: $(TARGET)
+TRAIN_SRCS = $(SRCDIR)/train.c
+PREDICT_SRCS = $(SRCDIR)/predict.c
 
-$(TARGET): $(OBJS)
+COMMON_OBJS = $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(COMMON_SRCS))
+TRAIN_OBJS = $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(TRAIN_SRCS))
+PREDICT_OBJS = $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(PREDICT_SRCS))
+
+all: $(BINDIR)/train $(BINDIR)/predict
+
+$(BINDIR)/train: $(COMMON_OBJS) $(TRAIN_OBJS)
 	mkdir -p $(BINDIR)
-	$(CC) $(CFLAGS) $(INCLUDES) -o $(TARGET) $(OBJS)
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^
+
+$(BINDIR)/predict: $(COMMON_OBJS) $(PREDICT_OBJS)
+	mkdir -p $(BINDIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.c
 	mkdir -p $(OBJDIR)
