@@ -28,8 +28,14 @@
 #define FC_INPUT_SIZE (CONV_OUT_CHANNELS * POOL_OUT_HEIGHT * POOL_OUT_WIDTH)
 #define FC_OUTPUT_SIZE NUM_CLASSES
 
-int main() {
+int main(int argc, char *argv[]) {
     srand(time(NULL));
+
+    // Проверяем режим работы
+    int inference_mode = 0;
+    if (argc > 1 && strcmp(argv[1], "inference") == 0) {
+        inference_mode = 1;
+    }
 
     const char *data_dir = "cifar-10-batches-bin";
     
@@ -102,57 +108,102 @@ int main() {
     float *relu_out = (float*)malloc(conv_output_size * sizeof(float));
     float *relu_dout = (float*)malloc(conv_output_size * sizeof(float));
     
-    int epochs = 5;
+    int epochs = 20;
     float learning_rate = 0.01f;
     
     int train_samples = 1000;
     
-    for (int epoch = 0; epoch < epochs; epoch++) {
-        float epoch_loss = 0.0f;
-        int correct = 0;
-        for (int n = 0; n < train_samples; n++) {
-            float *image = train.images + n * IMG_CHANNELS * IMG_HEIGHT * IMG_WIDTH;
-            int label = train.labels[n];
+    if (inference_mode) {
+        // Загружаем сохраненные веса
+        if (load_weights("weights/conv_weights.bin", conv.weights, conv_weight_size) == 0 &&
+            load_weights("weights/conv_biases.bin", conv.biases, conv.out_channels) == 0 &&
+            load_weights("weights/fc_weights.bin", fc.weights, fc_weight_size) == 0 &&
+            load_weights("weights/fc_biases.bin", fc.biases, fc.output_size) == 0) {
             
-            conv_forward(&conv, image);
-            relu_forward(conv.output, relu_out, conv_output_size);
-            maxpool_forward(&pool, relu_out);
-            memcpy(fc.input, pool.output, sizeof(float) * fc.input_size);
-            fc_forward(&fc, fc.input);
-            float loss = softmax(fc.output, fc.output_size, label, softmax_probs);
-            epoch_loss += loss;
+            printf("Веса успешно загружены. Начинаем инференс...\n");
             
-            int pred = 0;
-            float max_prob = softmax_probs[0];
-            for (int i = 1; i < fc.output_size; i++) {
-                if (softmax_probs[i] > max_prob) {
-                    max_prob = softmax_probs[i];
-                    pred = i;
-                }
+            // Загружаем тестовый набор
+            Dataset test = load_cifar10_test(data_dir);
+            printf("Загружено %d тестовых изображений.\n", test.num_samples);
+
+            // Проводим инференс на первых 10 изображениях
+            for (int i = 0; i < 10; i++) {
+                float *image = test.images + i * IMG_CHANNELS * IMG_HEIGHT * IMG_WIDTH;
+                int true_label = test.labels[i];
+                
+                int predicted_class = model_inference(image, &conv, &pool, &fc, relu_out, softmax_probs);
+                
+                // Сохраняем результат в файл
+                char filename[100];
+                snprintf(filename, sizeof(filename), "predictions/prediction_%d.txt", i);
+                save_prediction_result(filename, image, IMG_WIDTH, IMG_HEIGHT, IMG_CHANNELS,
+                                    get_class_name(predicted_class));
+                
+                printf("Истинный класс: %s\n\n", get_class_name(true_label));
             }
-            if (pred == label)
-                correct++;
             
-            softmax_backward(softmax_probs, label, fc.output_size, fc_dout);
-            fc_backward(&fc, fc_dout, fc_dinput);
-            memcpy(pool_dout, fc_dinput, sizeof(float) * fc.input_size);
-            maxpool_backward(&pool, pool_dout, relu_dout);
-            relu_backward(conv.output, relu_dout, conv_dout, conv_output_size);
-            conv_backward(&conv, conv_dout, conv_input_grad);
-            
-            update_parameters(conv.weights, conv.dweights, conv_weight_size, learning_rate);
-            update_parameters(conv.biases, conv.dbiases, conv.out_channels, learning_rate);
-            update_parameters(fc.weights, fc.dweights, fc_weight_size, learning_rate);
-            update_parameters(fc.biases, fc.dbiases, fc.output_size, learning_rate);
+            free(test.images);
+            free(test.labels);
+        } else {
+            printf("Ошибка: Не удалось загрузить веса модели\n");
         }
-        printf("Epoch %d: Loss = %f, Accuracy = %.2f%%\n",
-               epoch + 1, epoch_loss / train_samples, (100.0 * correct) / train_samples);
+    } else {
+        // Режим обучения
+        for (int epoch = 0; epoch < epochs; epoch++) {
+            float epoch_loss = 0.0f;
+            int correct = 0;
+            for (int n = 0; n < train_samples; n++) {
+                float *image = train.images + n * IMG_CHANNELS * IMG_HEIGHT * IMG_WIDTH;
+                int label = train.labels[n];
+                
+                conv_forward(&conv, image);
+                relu_forward(conv.output, relu_out, conv_output_size);
+                maxpool_forward(&pool, relu_out);
+                memcpy(fc.input, pool.output, sizeof(float) * fc.input_size);
+                fc_forward(&fc, fc.input);
+                float loss = softmax(fc.output, fc.output_size, label, softmax_probs);
+                epoch_loss += loss;
+                
+                int pred = 0;
+                float max_prob = softmax_probs[0];
+                for (int i = 1; i < fc.output_size; i++) {
+                    if (softmax_probs[i] > max_prob) {
+                        max_prob = softmax_probs[i];
+                        pred = i;
+                    }
+                }
+                if (pred == label)
+                    correct++;
+                
+                softmax_backward(softmax_probs, label, fc.output_size, fc_dout);
+                fc_backward(&fc, fc_dout, fc_dinput);
+                memcpy(pool_dout, fc_dinput, sizeof(float) * fc.input_size);
+                maxpool_backward(&pool, pool_dout, relu_dout);
+                relu_backward(conv.output, relu_dout, conv_dout, conv_output_size);
+                conv_backward(&conv, conv_dout, conv_input_grad);
+                
+                update_parameters(conv.weights, conv.dweights, conv_weight_size, learning_rate);
+                update_parameters(conv.biases, conv.dbiases, conv.out_channels, learning_rate);
+                update_parameters(fc.weights, fc.dweights, fc_weight_size, learning_rate);
+                update_parameters(fc.biases, fc.dbiases, fc.output_size, learning_rate);
+            }
+            printf("Epoch %d: Loss = %f, Accuracy = %.2f%%\n",
+                   epoch + 1, epoch_loss / train_samples, (100.0 * correct) / train_samples);
+
+            // Сохраняем веса сверточного слоя
+            if (save_weights("weights/conv_weights.bin", conv.weights, conv_weight_size) == 0) {
+                save_weights("weights/conv_biases.bin", conv.biases, conv.out_channels);
+            }
+
+            // Сохраняем веса полносвязного слоя
+            if (save_weights("weights/fc_weights.bin", fc.weights, fc_weight_size) == 0) {
+                save_weights("weights/fc_biases.bin", fc.biases, fc.output_size);
+            }
+        }
+        
+        free(train.images);
+        free(train.labels);
     }
-    
-    free(train.images);
-    free(train.labels);
-    free(test.images);
-    free(test.labels);
     
     free(conv.weights); free(conv.biases); free(conv.dweights); free(conv.dbiases);
     free(conv.input); free(conv.output);
