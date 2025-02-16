@@ -17,7 +17,7 @@ typedef struct {
     float *dbiases;    
 } ConvLayer;
 
-void conv_forward(ConvLayer *layer, float *input);
+void conv_forward(const ConvLayer *layer, const float *input);
 void conv_backward(ConvLayer *layer, float *dout, float *dinput);
 
 #endif 

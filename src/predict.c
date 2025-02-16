@@ -75,10 +75,10 @@ int main(int argc, char *argv[]) {
     float *relu_out = (float*)malloc(conv_output_size * sizeof(float));
 
     // Загружаем сохраненные веса
-    if (load_weights("weights/conv_weights.bin", conv.weights, conv_weight_size) == 0 &&
-        load_weights("weights/conv_biases.bin", conv.biases, conv.out_channels) == 0 &&
-        load_weights("weights/fc_weights.bin", fc.weights, fc_weight_size) == 0 &&
-        load_weights("weights/fc_biases.bin", fc.biases, fc.output_size) == 0) {
+    if (model_load_weights("weights/conv_weights.bin", conv.weights, conv_weight_size) == 0 &&
+        model_load_weights("weights/conv_biases.bin", conv.biases, conv.out_channels) == 0 &&
+        model_load_weights("weights/fc_weights.bin", fc.weights, fc_weight_size) == 0 &&
+        model_load_weights("weights/fc_biases.bin", fc.biases, fc.output_size) == 0) {
         
         printf("Веса успешно загружены. Начинаем инференс...\n");
 
@@ -102,10 +102,10 @@ int main(int argc, char *argv[]) {
             // Сохраняем результат в файл
             char filename[100];
             snprintf(filename, sizeof(filename), "predictions/prediction_%d.txt", i);
-            save_prediction_result(filename, image, IMG_WIDTH, IMG_HEIGHT, IMG_CHANNELS,
-                                get_class_name(predicted_class));
+            model_save_prediction_result(filename, image, IMG_WIDTH, IMG_HEIGHT, IMG_CHANNELS,
+                                model_get_class_name(predicted_class));
             
-            printf("Истинный класс: %s\n\n", get_class_name(true_label));
+            printf("Истинный класс: %s\n\n", model_get_class_name(true_label));
             
             if (predicted_class == true_label) {
                 total_correct++;

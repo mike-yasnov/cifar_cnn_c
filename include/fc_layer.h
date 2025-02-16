@@ -12,7 +12,7 @@ typedef struct {
     float *dbiases;   
 } FCLayer;
 
-void fc_forward(FCLayer *fc, float *input);
+void fc_forward(const FCLayer *fc, const float *input);
 void fc_backward(FCLayer *fc, float *dout, float *dinput);
 
 #endif 

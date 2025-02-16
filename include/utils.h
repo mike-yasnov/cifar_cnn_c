@@ -5,15 +5,18 @@
 #include "fc_layer.h"
 #include "maxpool_layer.h"
 
-// Существующие функции
-void update_parameters(float *params, float *grads, int size, float learning_rate);
-int save_weights(const char *filename, float *weights, int size);
-int load_weights(const char *filename, float *weights, int size);
+// Функции для работы с параметрами модели
+void model_update_parameters(float *params, float *grads, int size, float learning_rate);
+int model_save_weights(const char *filename, const float *weights, int size);
+int model_load_weights(const char *filename, float *weights, int size);
+void model_save_prediction_result(const char *filename, const float *image, int width, int height, int channels, const char *prediction);
+const char* model_get_class_name(int class_id);
 
-// Новые функции для инференса и работы с изображениями
-const char* get_class_name(int class_id);
-void save_prediction_result(const char *filename, float *image, int width, int height, int channels, const char *predicted_class);
-int model_inference(float *image, ConvLayer *conv, MaxPoolLayer *pool, FCLayer *fc,
-                   float *relu_out, float *softmax_probs);
+// Функции для инференса и визуализации
+void model_save_prediction(const char *filename, const float *image, 
+                         int width, int height, int channels,
+                         const char *predicted_class);
+int model_inference(const float *image, const ConvLayer *conv, const MaxPoolLayer *pool,
+                   const FCLayer *fc, float *relu_out, float *softmax_probs);
 
 #endif // UTILS_H

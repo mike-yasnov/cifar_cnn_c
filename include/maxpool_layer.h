@@ -13,7 +13,7 @@ typedef struct {
     int *max_index;   
 } MaxPoolLayer;
 
-void maxpool_forward(MaxPoolLayer *pool, float *input);
+void maxpool_forward(const MaxPoolLayer *pool, const float *input);
 void maxpool_backward(MaxPoolLayer *pool, float *dout, float *dinput);
 
 #endif 

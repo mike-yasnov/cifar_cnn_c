@@ -1,14 +1,16 @@
 #include "fc_layer.h"
 #include <string.h>
 
-void fc_forward(FCLayer *fc, float *input) {
-    memcpy(fc->input, input, sizeof(float) * fc->input_size);
+void fc_forward(const FCLayer *fc, const float *input) {
+    float *fc_input = (float *)fc->input;  // временное приведение типа для совместимости
+    float *fc_output = (float *)fc->output;  // временное приведение типа для совместимости
+    memcpy(fc_input, input, sizeof(float) * fc->input_size);
     for (int i = 0; i < fc->output_size; i++) {
         float sum = fc->biases[i];
         for (int j = 0; j < fc->input_size; j++) {
             sum += fc->weights[i * fc->input_size + j] * input[j];
         }
-        fc->output[i] = sum;
+        fc_output[i] = sum;
     }
 }
 

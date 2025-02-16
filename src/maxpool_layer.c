@@ -3,9 +3,12 @@
 #include <math.h>
 #include <float.h>
 
-void maxpool_forward(MaxPoolLayer *pool, float *input) {
+void maxpool_forward(const MaxPoolLayer *pool, const float *input) {
     int total_in = pool->channels * pool->in_height * pool->in_width;
-    memcpy(pool->input, input, sizeof(float) * total_in);
+    float *pool_input = (float *)pool->input;  // временное приведение типа для совместимости
+    float *pool_output = (float *)pool->output;  // временное приведение типа для совместимости
+    int *pool_max_index = (int *)pool->max_index;  // временное приведение типа для совместимости
+    memcpy(pool_input, input, sizeof(float) * total_in);
     
     for (int c = 0; c < pool->channels; c++) {
         for (int oh = 0; oh < pool->out_height; oh++) {
@@ -26,8 +29,8 @@ void maxpool_forward(MaxPoolLayer *pool, float *input) {
                     }
                 }
                 int out_idx = c * (pool->out_height * pool->out_width) + oh * pool->out_width + ow;
-                pool->output[out_idx] = max_val;
-                pool->max_index[out_idx] = max_idx;
+                pool_output[out_idx] = max_val;
+                pool_max_index[out_idx] = max_idx;
             }
         }
     }
