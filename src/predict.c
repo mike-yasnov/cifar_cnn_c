@@ -16,43 +16,63 @@
 #define IMG_CHANNELS 3
 #define NUM_CLASSES  10
 
-#define CONV_KERNEL_SIZE 3
-#define CONV_OUT_CHANNELS 16
-#define CONV_OUT_HEIGHT (IMG_HEIGHT - CONV_KERNEL_SIZE + 1)
-#define CONV_OUT_WIDTH  (IMG_WIDTH - CONV_KERNEL_SIZE + 1)
+#define CONV1_KERNEL_SIZE 3
+#define CONV1_OUT_CHANNELS 32
+#define CONV1_OUT_HEIGHT (IMG_HEIGHT - CONV1_KERNEL_SIZE + 1)
+#define CONV1_OUT_WIDTH  (IMG_WIDTH - CONV1_KERNEL_SIZE + 1)
+
+#define CONV2_KERNEL_SIZE 3
+#define CONV2_OUT_CHANNELS 64
+#define CONV2_OUT_HEIGHT (CONV1_OUT_HEIGHT - CONV2_KERNEL_SIZE + 1)
+#define CONV2_OUT_WIDTH  (CONV1_OUT_WIDTH - CONV2_KERNEL_SIZE + 1)
 
 #define POOL_SIZE 2
-#define POOL_OUT_HEIGHT (CONV_OUT_HEIGHT / POOL_SIZE)
-#define POOL_OUT_WIDTH  (CONV_OUT_WIDTH / POOL_SIZE)
+#define POOL_OUT_HEIGHT (CONV2_OUT_HEIGHT / POOL_SIZE)
+#define POOL_OUT_WIDTH  (CONV2_OUT_WIDTH / POOL_SIZE)
 
-#define FC_INPUT_SIZE (CONV_OUT_CHANNELS * POOL_OUT_HEIGHT * POOL_OUT_WIDTH)
+#define FC_INPUT_SIZE (CONV2_OUT_CHANNELS * POOL_OUT_HEIGHT * POOL_OUT_WIDTH)
 #define FC_OUTPUT_SIZE NUM_CLASSES
 
 int main(int argc, char *argv[]) {
     const char *data_dir = "cifar-10-batches-bin";
     
-    // Загружаем тестовый набор
     Dataset test = load_cifar10_test(data_dir);
     printf("Загружено %d тестовых изображений.\n", test.num_samples);
     
-    ConvLayer conv;
-    conv.in_channels = IMG_CHANNELS;
-    conv.out_channels = CONV_OUT_CHANNELS;
-    conv.kernel_size = CONV_KERNEL_SIZE;
-    conv.in_height = IMG_HEIGHT;
-    conv.in_width = IMG_WIDTH;
-    conv.out_height = CONV_OUT_HEIGHT;
-    conv.out_width = CONV_OUT_WIDTH;
-    int conv_weight_size = conv.out_channels * conv.in_channels * conv.kernel_size * conv.kernel_size;
-    conv.weights = (float*)malloc(conv_weight_size * sizeof(float));
-    conv.biases = (float*)malloc(conv.out_channels * sizeof(float));
-    conv.input = (float*)malloc(conv.in_channels * conv.in_height * conv.in_width * sizeof(float));
-    conv.output = (float*)malloc(conv.out_channels * conv.out_height * conv.out_width * sizeof(float));
+    // Первый сверточный слой
+    ConvLayer conv1;
+    conv1.in_channels = IMG_CHANNELS;
+    conv1.out_channels = CONV1_OUT_CHANNELS;
+    conv1.kernel_size = CONV1_KERNEL_SIZE;
+    conv1.in_height = IMG_HEIGHT;
+    conv1.in_width = IMG_WIDTH;
+    conv1.out_height = CONV1_OUT_HEIGHT;
+    conv1.out_width = CONV1_OUT_WIDTH;
+    int conv1_weight_size = conv1.out_channels * conv1.in_channels * conv1.kernel_size * conv1.kernel_size;
+    conv1.weights = (float*)malloc(conv1_weight_size * sizeof(float));
+    conv1.biases = (float*)malloc(conv1.out_channels * sizeof(float));
+    conv1.input = (float*)malloc(conv1.in_channels * conv1.in_height * conv1.in_width * sizeof(float));
+    conv1.output = (float*)malloc(conv1.out_channels * conv1.out_height * conv1.out_width * sizeof(float));
+    
+    // Второй сверточный слой
+    ConvLayer conv2;
+    conv2.in_channels = CONV1_OUT_CHANNELS;
+    conv2.out_channels = CONV2_OUT_CHANNELS;
+    conv2.kernel_size = CONV2_KERNEL_SIZE;
+    conv2.in_height = CONV1_OUT_HEIGHT;
+    conv2.in_width = CONV1_OUT_WIDTH;
+    conv2.out_height = CONV2_OUT_HEIGHT;
+    conv2.out_width = CONV2_OUT_WIDTH;
+    int conv2_weight_size = conv2.out_channels * conv2.in_channels * conv2.kernel_size * conv2.kernel_size;
+    conv2.weights = (float*)malloc(conv2_weight_size * sizeof(float));
+    conv2.biases = (float*)malloc(conv2.out_channels * sizeof(float));
+    conv2.input = (float*)malloc(conv2.in_channels * conv2.in_height * conv2.in_width * sizeof(float));
+    conv2.output = (float*)malloc(conv2.out_channels * conv2.out_height * conv2.out_width * sizeof(float));
     
     MaxPoolLayer pool;
-    pool.channels = conv.out_channels;
-    pool.in_height = conv.out_height;
-    pool.in_width = conv.out_width;
+    pool.channels = conv2.out_channels;
+    pool.in_height = conv2.out_height;
+    pool.in_width = conv2.out_width;
     pool.pool_size = POOL_SIZE;
     pool.out_height = POOL_OUT_HEIGHT;
     pool.out_width = POOL_OUT_WIDTH;
@@ -71,19 +91,22 @@ int main(int argc, char *argv[]) {
     fc.output = (float*)malloc(fc.output_size * sizeof(float));
     
     float *softmax_probs = (float*)malloc(fc.output_size * sizeof(float));
-    int conv_output_size = conv.out_channels * conv.out_height * conv.out_width;
-    float *relu_out = (float*)malloc(conv_output_size * sizeof(float));
+    int conv1_output_size = conv1.out_channels * conv1.out_height * conv1.out_width;
+    float *relu1_out = (float*)malloc(conv1_output_size * sizeof(float));
+    int conv2_output_size = conv2.out_channels * conv2.out_height * conv2.out_width;
+    float *relu2_out = (float*)malloc(conv2_output_size * sizeof(float));
 
     // Загружаем сохраненные веса
-    if (model_load_weights("weights/conv_weights.bin", conv.weights, conv_weight_size) == 0 &&
-        model_load_weights("weights/conv_biases.bin", conv.biases, conv.out_channels) == 0 &&
+    if (model_load_weights("weights/conv1_weights.bin", conv1.weights, conv1_weight_size) == 0 &&
+        model_load_weights("weights/conv1_biases.bin", conv1.biases, conv1.out_channels) == 0 &&
+        model_load_weights("weights/conv2_weights.bin", conv2.weights, conv2_weight_size) == 0 &&
+        model_load_weights("weights/conv2_biases.bin", conv2.biases, conv2.out_channels) == 0 &&
         model_load_weights("weights/fc_weights.bin", fc.weights, fc_weight_size) == 0 &&
         model_load_weights("weights/fc_biases.bin", fc.biases, fc.output_size) == 0) {
         
         printf("Веса успешно загружены. Начинаем инференс...\n");
 
-        // Определяем количество изображений для предсказания
-        int num_images = 10;  // По умолчанию 10 изображений
+        int num_images = 50;
         if (argc > 1) {
             num_images = atoi(argv[1]);
             if (num_images <= 0 || num_images > test.num_samples) {
@@ -91,20 +114,40 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        // Проводим инференс
         int total_correct = 0;
         for (int i = 0; i < num_images; i++) {
             float *image = test.images + i * IMG_CHANNELS * IMG_HEIGHT * IMG_WIDTH;
             int true_label = test.labels[i];
             
-            int predicted_class = model_inference(image, &conv, &pool, &fc, relu_out, softmax_probs);
+            // Прямой проход через сеть
+            conv_forward(&conv1, image);
+            relu_forward(conv1.output, relu1_out, conv1_output_size);
+            conv_forward(&conv2, relu1_out);
+            relu_forward(conv2.output, relu2_out, conv2_output_size);
+            maxpool_forward(&pool, relu2_out);
+            memcpy(fc.input, pool.output, sizeof(float) * fc.input_size);
+            fc_forward(&fc, fc.input);
+            softmax(fc.output, fc.output_size, 0, softmax_probs);
             
-            // Сохраняем результат в файл
+            // Находим класс с максимальной вероятностью
+            int predicted_class = 0;
+            float max_prob = softmax_probs[0];
+            for (int j = 1; j < fc.output_size; j++) {
+                if (softmax_probs[j] > max_prob) {
+                    max_prob = softmax_probs[j];
+                    predicted_class = j;
+                }
+            }
+            
+            // Сохраняем результат
             char filename[100];
             snprintf(filename, sizeof(filename), "predictions/prediction_%d.txt", i);
             model_save_prediction_result(filename, image, IMG_WIDTH, IMG_HEIGHT, IMG_CHANNELS,
-                                model_get_class_name(predicted_class));
+                                      model_get_class_name(predicted_class));
             
+            printf("Изображение %d:\n", i + 1);
+            printf("Предсказание: %s (уверенность: %.2f%%)\n", 
+                   model_get_class_name(predicted_class), max_prob * 100);
             printf("Истинный класс: %s\n\n", model_get_class_name(true_label));
             
             if (predicted_class == true_label) {
@@ -122,13 +165,16 @@ int main(int argc, char *argv[]) {
     free(test.images);
     free(test.labels);
     
-    free(conv.weights); free(conv.biases);
-    free(conv.input); free(conv.output);
+    free(conv1.weights); free(conv1.biases);
+    free(conv1.input); free(conv1.output);
+    free(conv2.weights); free(conv2.biases);
+    free(conv2.input); free(conv2.output);
     free(pool.input); free(pool.output); free(pool.max_index);
     free(fc.weights); free(fc.biases);
     free(fc.input); free(fc.output);
     free(softmax_probs);
-    free(relu_out);
+    free(relu1_out);
+    free(relu2_out);
     
     return 0;
 } 
