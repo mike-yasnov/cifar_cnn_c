@@ -228,19 +228,18 @@ void model_save_prediction_result(const char *filename, const float *image, int 
         return;
     }
 
+    char image_filename[MAX_FILENAME_LENGTH] = {0};
+    strncpy(image_filename, filename, MAX_FILENAME_LENGTH - 1);
+    char *dot = strrchr(image_filename, '.');
+    if (dot) {
+        strcpy(dot, ".png");
+    }
+
+    fprintf(file, "Информация о предсказании:\n");
+    fprintf(file, "--------------------\n");
     fprintf(file, "Размер изображения: %dx%dx%d\n", width, height, channels);
     fprintf(file, "Предсказанный класс: %s\n", prediction);
-    fprintf(file, "\nПиксели изображения:\n");
-
-    for (int c = 0; c < channels; c++) {
-        fprintf(file, "\nКанал %d:\n", c);
-        for (int h = 0; h < height; h++) {
-            for (int w = 0; w < width; w++) {
-                fprintf(file, "%.4f ", image[(c * height * width) + (h * width) + w]);
-            }
-            fprintf(file, "\n");
-        }
-    }
+    fprintf(file, "Изображение сохранено в: %s\n", image_filename);
 
     fclose(file);
 }

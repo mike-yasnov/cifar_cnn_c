@@ -3,6 +3,7 @@
 #include <time.h>
 #include <string.h>
 #include <math.h>
+#include <sys/stat.h>
 
 #include "conv_layer.h"
 #include "fc_layer.h"
@@ -69,6 +70,16 @@ void normalize_image(float *image) {
 
 int main(int argc, char *argv[]) {
     const char *data_dir = "cifar-10-batches-bin";
+    
+    // Создаем директорию для сохранения предсказаний, если она не существует
+    struct stat st = {0};
+    if (stat("predictions", &st) == -1) {
+        #ifdef _WIN32
+            mkdir("predictions");
+        #else
+            mkdir("predictions", 0700);
+        #endif
+    }
     
     Dataset test = load_cifar10_test(data_dir);
     printf("Загружено %d тестовых изображений.\n", test.num_samples);
@@ -179,6 +190,12 @@ int main(int argc, char *argv[]) {
             // Сохраняем результат
             char filename[100];
             snprintf(filename, sizeof(filename), "predictions/prediction_%d.txt", i);
+            
+            // Сохраняем изображение и информацию о предсказании
+            model_save_prediction(filename, image, IMG_WIDTH, IMG_HEIGHT, IMG_CHANNELS,
+                              model_get_class_name(predicted_class));
+            
+            // Сохраняем детальную информацию в текстовый файл
             model_save_prediction_result(filename, image, IMG_WIDTH, IMG_HEIGHT, IMG_CHANNELS,
                                       model_get_class_name(predicted_class));
             
