@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+#include <math.h>
 
 #include "conv_layer.h"
 #include "fc_layer.h"
@@ -32,6 +33,39 @@
 
 #define FC_INPUT_SIZE (CONV2_OUT_CHANNELS * POOL_OUT_HEIGHT * POOL_OUT_WIDTH)
 #define FC_OUTPUT_SIZE NUM_CLASSES
+
+// Функция для нормализации изображения
+void normalize_image(float *image) {
+    float mean[3] = {0.0f, 0.0f, 0.0f};
+    float std[3] = {0.0f, 0.0f, 0.0f};
+    int pixels_per_channel = IMG_HEIGHT * IMG_WIDTH;
+    
+    // Вычисляем среднее для каждого канала
+    for (int c = 0; c < IMG_CHANNELS; c++) {
+        for (int i = 0; i < pixels_per_channel; i++) {
+            mean[c] += image[c * pixels_per_channel + i];
+        }
+        mean[c] /= pixels_per_channel;
+    }
+    
+    // Вычисляем стандартное отклонение для каждого канала
+    for (int c = 0; c < IMG_CHANNELS; c++) {
+        for (int i = 0; i < pixels_per_channel; i++) {
+            float diff = image[c * pixels_per_channel + i] - mean[c];
+            std[c] += diff * diff;
+        }
+        std[c] = sqrt(std[c] / pixels_per_channel);
+        if (std[c] < 1e-6f) std[c] = 1.0f;
+    }
+    
+    // Нормализуем каждый канал
+    for (int c = 0; c < IMG_CHANNELS; c++) {
+        for (int i = 0; i < pixels_per_channel; i++) {
+            image[c * pixels_per_channel + i] = 
+                (image[c * pixels_per_channel + i] - mean[c]) / std[c];
+        }
+    }
+}
 
 int main(int argc, char *argv[]) {
     const char *data_dir = "cifar-10-batches-bin";
@@ -118,6 +152,9 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < num_images; i++) {
             float *image = test.images + i * IMG_CHANNELS * IMG_HEIGHT * IMG_WIDTH;
             int true_label = test.labels[i];
+            
+            // Нормализуем изображение перед прямым проходом
+            normalize_image(image);
             
             // Прямой проход через сеть
             conv_forward(&conv1, image);
